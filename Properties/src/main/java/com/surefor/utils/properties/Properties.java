@@ -4,6 +4,7 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.configuration.SystemConfiguration;
+import org.apache.commons.lang.StringUtils;
 
 import java.io.File;
 import java.nio.file.Paths;
@@ -20,7 +21,7 @@ import java.util.Objects;
 public class Properties {
     private Map<String, Configuration> configs = new HashMap();
     private static Properties instance = null ;
-    private final String SYSTEM_PROPERTIES = "_SYSTEM_" ;
+    public final String SYSTEM_PROPERTIES = "_SYSTEM_" ;
 
     /**
      * Singleton implementation.
@@ -36,8 +37,7 @@ public class Properties {
      * Private class constructor
      */
     private Properties() {
-        // Load system properties
-        loadProperties();
+        loadProperties(); // Load system properties as default
     }
 
     /**
@@ -53,7 +53,7 @@ public class Properties {
      * @throws NullPointerException If null valued parameter is passed.
      * @throws ProperitesNotFondException If it fails to search with specified properties name
      */
-    public Configuration getConfig(String properites)
+    private Configuration getConfig(String properites)
             throws NullPointerException, ProperitesNotFondException {
         Objects.requireNonNull(properites) ;
 
@@ -75,11 +75,11 @@ public class Properties {
      * Loads a properties file and add it to internal list.
      * @param properties Properties file name include path
      * @throws NullPointerException Null valued parameter passed
-     * @throws ProperitesAlreadyExistException AlreadyExistException Specified properties exists in the list.
+     * @throws ProperitesExistException AlreadyExistException Specified properties exists in the list.
      * @throws ConfigurationException Failed to load properties file.
      */
     public void loadProperties(String properties)
-            throws NullPointerException, ProperitesAlreadyExistException, ConfigurationException {
+            throws NullPointerException, ProperitesExistException, ConfigurationException {
         Objects.requireNonNull(properties) ;
 
         load(properties, false) ;
@@ -88,8 +88,9 @@ public class Properties {
     /**
      * Clears configuration map.
      */
-    private void clear() {
+    public void clear() {
         configs.clear();
+        load() ;
     }
 
     /**
@@ -100,60 +101,101 @@ public class Properties {
     }
 
     /**
-     *
+     * Load properties file 
+     * 
      * @param properties Properties name to load
-     * @param replace If
+     * @param replace true - replace it if specified properties is already loaded. 
      * @throws ConfigurationException It failed to load properites file.
-     * @throws ProperitesAlreadyExistException Specified properties is already loaded and caller does not want to replace existing configuration.
      */
-    private void load(String properties, Boolean replace)
-            throws ConfigurationException, ProperitesAlreadyExistException {
+    private void load(String properties, Boolean replace) throws ConfigurationException {
         assert(properties != null) ;
 
         String key = Paths.get(properties).getFileName().toString() ;
         PropertiesConfiguration config = new PropertiesConfiguration(properties) ;
         if(!configs.containsKey(properties) || (configs.containsKey(properties) && replace)) {
             configs.put(key, config) ;
-        } else {
-            throw new ProperitesAlreadyExistException(properties) ;
-        }
-    }
-
-    /**
-     *
-     * @param key
-     * @return Apache (@link org.apache.commons.configuration.Configuration) object
-     * @throws ProperitesNotFondException
-     */
-    public Configuration get(String key) throws ProperitesNotFondException{
-        if(configs.containsKey(key)) {
-            return configs.get(key) ;
-        } else {
-            throw new ProperitesNotFondException(key) ;
-        }
+        } 
     }
 
     /**
      * Determines specified properties is loaded.
-     * @param key Properties name
+     * @param properties Properties name
      * @return true if specified properties is found, false if not.
      */
-    public Boolean isLoaded(String key)  {
-        return configs.containsKey(key) ;
+    public Boolean isLoaded(String properties)  {
+        return configs.containsKey(properties) ;
     }
 
-    public String get(String key, String property) throws ProperitesNotFondException {
-        if(isLoaded(key)) {
-            Configuration config = configs.get(key) ;
-            config.getProperty(property) ;
-            if (config.containsKey(property)) {
-                config.getString(key) ;
-            } else {
-                return null ;
-            }
-        } else {
-            throw new ProperitesNotFondException(key) ;
-        }
-        return null ;
+    public Boolean isNotLoaded(String properties)  {
+        return !isLoaded(properties) ;
     }
+    
+    /**
+     * Get a configuration value in String type 
+     * 
+     * @param properties properties file name 
+     * @param configName configuration name
+     * @return
+     * @throws ProperitesNotFondException If it failed to search properties  
+     * @throws ConfigNotFondException  if it failed to search configName
+     */
+    public String get(String properties, String configName) throws ProperitesNotFondException, ConfigNotFondException {
+    	Configuration config = getConfig(properties) ;
+        if (config.containsKey(configName)) {
+            return config.getString(configName) ;
+        } else {
+            throw new ConfigNotFondException(configName) ;
+        }
+    }
+    
+    /**
+     * Put a configuration item into the properties file  
+     * @param properties Properties file name (full path)
+     * @param configName Configuration name 
+     * @param configValue Configuration value. It will turn to empty string if null value is passed.
+     * @throws ConfigurationException if it failed to search configName
+     * @throws NullPointerException if properties and/or configName is null
+     * @throws ProperitesNotFondException if it failed to search properties 
+     */
+    public void put(String properties, String configName, String configValue) throws ConfigurationException, NullPointerException, ProperitesNotFondException {
+    	Objects.requireNonNull(properties) ; 
+    	Objects.requireNonNull(configName) ; 
+    	
+    	if(isNotLoaded(properties)) {
+			load(properties, true) ;
+    	}
+
+    	PropertiesConfiguration config = (PropertiesConfiguration) getConfig(properties) ;
+    	if(config.containsKey(configName)) {
+    		config.setProperty(configName, StringUtils.defaultString(configValue)) ;
+    	} else {
+        	config.addProperty(configName, StringUtils.defaultString(configValue)) ;
+    	}
+    	config.save() ;
+    }
+    
+    /**
+     * 
+     * @param properties
+     * @param configName
+     * @param configValue
+     * @throws ConfigurationException
+     * @throws ProperitesExistException
+     * @throws NullPointerException
+     * @throws ProperitesNotFondException
+     */
+    public void add(String properties, String configName, String configValue) throws ConfigurationException, ProperitesExistException, NullPointerException, ProperitesNotFondException {
+    	Objects.requireNonNull(properties) ; 
+    	Objects.requireNonNull(configName) ; 
+    	
+    	if(isNotLoaded(properties)) {
+    		load(properties, true) ;
+    	}
+
+    	PropertiesConfiguration config = (PropertiesConfiguration) getConfig(properties) ;
+    	config.addProperty(configName, StringUtils.defaultString(configValue)) ;
+    	
+    	config.save() ;
+    }
+    
 }
