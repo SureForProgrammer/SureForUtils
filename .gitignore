@@ -1,3 +1,6 @@
 /Properties/*.classpath
 /Properties/*.project
 /Properties/.settings
+/logging/.settings
+/logging/.classpath
+/logging/.project

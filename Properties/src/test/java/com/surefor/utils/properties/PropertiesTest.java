@@ -84,13 +84,4 @@ public class PropertiesTest {
         assertEquals(value, value4) ;
     }
 
-    @Test
-    public void testLoadProperties() throws Exception {
-
-    }
-
-    @Test
-    public void testLoadProperties1() throws Exception {
-
-    }
 }
